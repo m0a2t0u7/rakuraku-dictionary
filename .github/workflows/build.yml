@@ -12,12 +12,11 @@ jobs:
   apk:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
@@ -35,8 +34,15 @@ jobs:
           KEY_ALIAS: rakuraku
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          if [ "$SIGNED" = "1" ]; then gradle :app:assembleRelease --no-daemon
-          else unset KEYSTORE_PATH; gradle :app:assembleDebug --no-daemon; fi
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          T=assembleDebug; if [ "$SIGNED" = "1" ]; then T=assembleRelease; else unset KEYSTORE_PATH; fi
+          set +e
+          gradle :app:$T --no-daemon 2>&1 | tee build.log
+          code=${PIPESTATUS[0]}
+          if [ $code -ne 0 ]; then
+            grep -E "error:|What went wrong|\.java:[0-9]+|Exception|> " build.log | head -40 | while IFS= read -r l; do echo "::error::$l"; done
+          fi
+          exit $code
       - name: Rename
         id: v
         run: |
