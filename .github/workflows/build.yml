@@ -23,10 +23,12 @@ jobs:
       - name: Decode keystore
         env:
           KS: ${{ secrets.KEYSTORE_BASE64 }}
+          PW: ${{ secrets.KEY_PASSWORD }}
         run: |
           if [ -z "$KS" ]; then echo "::warning::Secret KEYSTORE_BASE64 が未登録のため、確認用ビルドのみ行います"; echo "SIGNED=0" >> $GITHUB_ENV; exit 0; fi
           echo "$KS" | base64 -d > $RUNNER_TEMP/release.jks
           echo "SIGNED=1" >> $GITHUB_ENV
+          echo "::notice::keystore size=$(wc -c < $RUNNER_TEMP/release.jks) sha=$(sha256sum $RUNNER_TEMP/release.jks | cut -c1-12) b64len=${#KS} pwlen=${#PW}"
       - name: Build
         env:
           KEYSTORE_PATH: ${{ runner.temp }}/release.jks
