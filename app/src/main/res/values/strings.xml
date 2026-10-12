@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="navigation_description">アプリでボタンを押した時だけ、Gboard設定の「単語リスト」「日本語」「＋」を順に選びます。最大20秒で停止します。文字の入力、辞書の保存・削除、他アプリの操作は行いません。</string>
+</resources>
