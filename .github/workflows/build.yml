@@ -40,7 +40,7 @@ jobs:
           gradle :app:$T --no-daemon 2>&1 | tee build.log
           code=${PIPESTATUS[0]}
           if [ $code -ne 0 ]; then
-            grep -E "error:|What went wrong|\.java:[0-9]+|Exception|> " build.log | head -40 | while IFS= read -r l; do echo "::error::$l"; done
+            { grep -E "error:|\.java:[0-9]+" build.log; grep -A12 "What went wrong" build.log; } | head -40 | while IFS= read -r l; do echo "::error::$l"; done
           fi
           exit $code
       - name: Rename
