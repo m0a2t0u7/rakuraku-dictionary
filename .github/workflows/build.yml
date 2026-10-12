@@ -25,26 +25,31 @@ jobs:
         env:
           KS: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          if [ -z "$KS" ]; then echo "::error::Secret KEYSTORE_BASE64 が未登録です"; exit 1; fi
+          if [ -z "$KS" ]; then echo "::warning::Secret KEYSTORE_BASE64 が未登録のため、確認用ビルドのみ行います"; echo "SIGNED=0" >> $GITHUB_ENV; exit 0; fi
           echo "$KS" | base64 -d > $RUNNER_TEMP/release.jks
+          echo "SIGNED=1" >> $GITHUB_ENV
       - name: Build
         env:
           KEYSTORE_PATH: ${{ runner.temp }}/release.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           KEY_ALIAS: rakuraku
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: gradle :app:assembleRelease --no-daemon
+        run: |
+          if [ "$SIGNED" = "1" ]; then gradle :app:assembleRelease --no-daemon
+          else unset KEYSTORE_PATH; gradle :app:assembleDebug --no-daemon; fi
       - name: Rename
         id: v
         run: |
           VER=$(grep -oP "versionName '\K[^']+" app/build.gradle)
           echo "ver=$VER" >> $GITHUB_OUTPUT
-          cp app/build/outputs/apk/release/app-release.apk rakuraku-dictionary-$VER.apk
+          if [ "$SIGNED" = "1" ]; then cp app/build/outputs/apk/release/app-release.apk rakuraku-dictionary-$VER.apk
+          else cp app/build/outputs/apk/debug/app-debug.apk rakuraku-dictionary-$VER-test.apk; fi
       - uses: actions/upload-artifact@v4
         with:
           name: rakuraku-dictionary-${{ steps.v.outputs.ver }}
           path: rakuraku-dictionary-*.apk
-      - name: Release (versionNameが新しいときだけ)
+      - name: Release (署名済みのときだけ)
+        if: env.SIGNED == '1'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
