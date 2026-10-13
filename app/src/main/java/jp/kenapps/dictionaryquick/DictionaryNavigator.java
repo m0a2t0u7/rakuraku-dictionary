@@ -27,6 +27,9 @@ import java.util.Locale;
  *  - ＋ボタンの判定を「含む」判定に緩和
  *  - 日本語の一覧の判定に「(品詞なし)」行の検出を追加
  *  - 失敗時に画面の要素一覧を診断ログとして保存
+ * 0.7.0の変更点:
+ *  - タップ後の固定待ちを0.8秒→0.35秒、判定待ちを0.2秒→0.08秒に短縮
+ *  - 画面が切り替わったイベントを受けたら待たずに次の操作へ進む
  */
 public class DictionaryNavigator extends AccessibilityService {
     static final String PACKAGE = "com.google.android.inputmethod.latin";
@@ -34,7 +37,8 @@ public class DictionaryNavigator extends AccessibilityService {
     static final int MAX_SCROLLS = 12;
     static final int MAX_PLUS_ATTEMPTS = 4;
     static final long TIMEOUT_MS = 20000;
-    static final long MIN_INTERVAL_MS = 800;
+    static final long MIN_INTERVAL_MS = 350;
+    static final long STEP_DELAY_MS = 80;
 
     static volatile long deadline = 0;
     static volatile boolean add = false;
@@ -75,6 +79,27 @@ public class DictionaryNavigator extends AccessibilityService {
 
     static void cancel() { deadline = 0; }
 
+    /** Gboardの設定画面を開く。MainActivityとクイック設定タイルの両方から使う。 */
+    static boolean openGboard(Context c) {
+        android.view.inputmethod.InputMethodManager imm =
+                (android.view.inputmethod.InputMethodManager) c.getSystemService(Context.INPUT_METHOD_SERVICE);
+        for (android.view.inputmethod.InputMethodInfo info : imm.getInputMethodList()) {
+            if (PACKAGE.equals(info.getPackageName()) && info.getSettingsActivity() != null) {
+                try {
+                    c.startActivity(new android.content.Intent(android.content.Intent.ACTION_MAIN)
+                            .setComponent(new ComponentName(PACKAGE, info.getSettingsActivity()))
+                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK | android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK));
+                    return true;
+                } catch (RuntimeException ignored) {
+                }
+            }
+        }
+        android.content.Intent i = c.getPackageManager().getLaunchIntentForPackage(PACKAGE);
+        if (i == null) return false;
+        try { c.startActivity(i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)); return true; }
+        catch (RuntimeException e) { return false; }
+    }
+
     // ---------- ライフサイクル ----------
 
     @Override protected void onServiceConnected() {
@@ -84,7 +109,11 @@ public class DictionaryNavigator extends AccessibilityService {
     }
 
     @Override public void onAccessibilityEvent(AccessibilityEvent e) {
-        if (deadline > 0 && e.getPackageName() != null && PACKAGE.contentEquals(e.getPackageName())) schedule();
+        if (deadline > 0 && e.getPackageName() != null && PACKAGE.contentEquals(e.getPackageName())) {
+            // 新しい画面が出たら、固定の待ち時間を待たずに次へ進む
+            if (e.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && !gesturePending) lastAction = 0;
+            schedule();
+        }
     }
 
     @Override public void onInterrupt() {
@@ -103,7 +132,7 @@ public class DictionaryNavigator extends AccessibilityService {
     void schedule() {
         if (!scheduled) {
             scheduled = true;
-            handler.postDelayed(step, 200);
+            handler.postDelayed(step, STEP_DELAY_MS);
         }
     }
 

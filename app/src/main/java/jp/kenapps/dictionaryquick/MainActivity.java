@@ -118,21 +118,6 @@ public class MainActivity extends Activity {
         sp.topMargin = dp(9);
         root.addView(sub, sp);
 
-        LinearLayout actions = new LinearLayout(this);
-        actions.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        ap.topMargin = dp(30);
-        root.addView(actions, ap);
-        actions.addView(action("＋", "新しく登録", "単語とよみを入力", true, () -> openDictionary(true)));
-        actions.addView(action("≡", "日本語の単語リスト", "登録内容を確認・編集", false, () -> openDictionary(false)));
-        actions.addView(action("↓", "CSVで一括登録", "内容を確認してZIPに変換", false, this::chooseCsv));
-
-        TextView note = label("単語の保存はGboardの画面で行います。", 12);
-        note.setTextColor(Color.rgb(100, 117, 122));
-        LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        np.topMargin = dp(8);
-        root.addView(note, np);
-
         String initial = "";
         if (saved != null) initial = saved.getString("status", "");
         else if (!DictionaryNavigator.enabled(this)) initial = "初回は右上の⋮で、自動移動を設定。";
@@ -142,6 +127,21 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams stp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         stp.topMargin = dp(20);
         root.addView(status, stp);
+
+        // 片手操作用：ボタンは画面の下にまとめ、いちばん押す「新しく登録」を最下段（親指の位置）に置く
+        root.addView(new View(this), new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+        TextView note = label("単語の保存はGboardの画面で行います。", 12);
+        note.setTextColor(Color.rgb(100, 117, 122));
+        LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        np.topMargin = dp(20);
+        np.bottomMargin = dp(8);
+        root.addView(note, np);
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.VERTICAL);
+        root.addView(actions, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        actions.addView(action("↓", "CSVで一括登録", "内容を確認してZIPに変換", false, this::chooseCsv));
+        actions.addView(action("≡", "日本語の単語リスト", "登録内容を確認・編集", false, () -> openDictionary(false)));
+        actions.addView(action("＋", "新しく登録", "単語とよみを入力", true, () -> openDictionary(true)));
         if (saved != null && saved.getBoolean("wasBusy")) {
             status.setText("CSVの読み込みを中断しました。もう一度CSVを選んでください。");
         }
@@ -312,16 +312,7 @@ public class MainActivity extends Activity {
     }
 
     boolean openGboardSettings() {
-        InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
-        for (InputMethodInfo info : imm.getInputMethodList()) {
-            if (GBOARD.equals(info.getPackageName()) && info.getSettingsActivity() != null
-                    && launch(new Intent(Intent.ACTION_MAIN).setComponent(new ComponentName(GBOARD, info.getSettingsActivity()))
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK))) {
-                return true;
-            }
-        }
-        Intent i = getPackageManager().getLaunchIntentForPackage(GBOARD);
-        return i != null && launch(i);
+        return DictionaryNavigator.openGboard(this);
     }
 
     Intent addExtras(Intent i) { i.putExtra("locale", "ja"); return i; }
